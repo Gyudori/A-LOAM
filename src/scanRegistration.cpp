@@ -63,7 +63,7 @@ const int systemDelay = 0;
 int systemInitCount = 0;
 bool systemInited = false;
 int N_SCANS = 0;
-float cloudCurvature[400000];
+float cloudCurvature[400000]; //float data with maximum array size 400000
 int cloudSortInd[400000];
 int cloudNeighborPicked[400000];
 int cloudLabel[400000];
@@ -130,7 +130,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     std::vector<int> scanEndInd(N_SCANS, 0);
 
     pcl::PointCloud<pcl::PointXYZ> laserCloudIn;
-    pcl::fromROSMsg(*laserCloudMsg, laserCloudIn);
+    pcl::fromROSMsg(*laserCloudMsg, laserCloudIn); //ROS Message로 들어온 *laserCloudMsg를 pcl의 PointXYZ로 변환
     std::vector<int> indices;
 
     pcl::removeNaNFromPointCloud(laserCloudIn, laserCloudIn, indices);
@@ -238,7 +238,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         float relTime = (ori - startOri) / (endOri - startOri);
         point.intensity = scanID + scanPeriod * relTime;
         laserCloudScans[scanID].push_back(point); 
-    }
+    }//여기까지가 정규성 검사 - 1)point cloud가 스캐닝 범위 내에 존재하는지, 2) 수평각이 알맞게 계산됐는지 확인
     
     cloudSize = count;
     printf("points size %d \n", cloudSize);
@@ -246,7 +246,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     pcl::PointCloud<PointType>::Ptr laserCloud(new pcl::PointCloud<PointType>());
     for (int i = 0; i < N_SCANS; i++)
     { 
-        scanStartInd[i] = laserCloud->size() + 5;
+        scanStartInd[i] = laserCloud->size() + 5; //아하... 클라우드가 시작하고 나서 1~4번째 point는 이웃이 10개가 안되기 때문에 start index를 5번째 부터 채우고 저장
         *laserCloud += laserCloudScans[i];
         scanEndInd[i] = laserCloud->size() - 6;
     }
@@ -263,7 +263,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         cloudSortInd[i] = i;
         cloudNeighborPicked[i] = 0;
         cloudLabel[i] = 0;
-    }
+    }//여기에서 curvature 계산
 
 
     TicToc t_pts;
@@ -281,7 +281,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         pcl::PointCloud<PointType>::Ptr surfPointsLessFlatScan(new pcl::PointCloud<PointType>);
         for (int j = 0; j < 6; j++)
         {
-            int sp = scanStartInd[i] + (scanEndInd[i] - scanStartInd[i]) * j / 6; 
+            int sp = scanStartInd[i] + (scanEndInd[i] - scanStartInd[i]) * j / 6; //Start와 End 사이를 6분할하고 6분할된 point의 시작점 sp, 끝점 ep
             int ep = scanStartInd[i] + (scanEndInd[i] - scanStartInd[i]) * (j + 1) / 6 - 1;
 
             TicToc t_tmp;
@@ -298,13 +298,13 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
                 {
 
                     largestPickedNum++;
-                    if (largestPickedNum <= 2)
+                    if (largestPickedNum <= 2) //6분할 된 1줄의 ring 내에서 가장 큰 curvature를 가지는 2개의 point를 corner sharp로 선정
                     {                        
                         cloudLabel[ind] = 2;
                         cornerPointsSharp.push_back(laserCloud->points[ind]);
                         cornerPointsLessSharp.push_back(laserCloud->points[ind]);
                     }
-                    else if (largestPickedNum <= 20)
+                    else if (largestPickedNum <= 20) // most 2 sharp를 포함한 20개의 point를 less sharp로 선정
                     {                        
                         cloudLabel[ind] = 1; 
                         cornerPointsLessSharp.push_back(laserCloud->points[ind]);
@@ -326,7 +326,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
                             break;
                         }
 
-                        cloudNeighborPicked[ind + l] = 1;
+                        cloudNeighborPicked[ind + l] = 1; //위 if문에서 임계값을 넘지 않으면 현재 선정된 점 주변은 모두 1로 바꾸어서 점 주변의 새로운 feature가 선정되지 않도록.
                     }
                     for (int l = -1; l >= -5; l--)
                     {
@@ -341,7 +341,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
                         cloudNeighborPicked[ind + l] = 1;
                     }
                 }
-            }
+            } //여기까지가 edge point(corner) feature를 추출하는 과정
 
             int smallestPickedNum = 0;
             for (int k = sp; k <= ep; k++)
@@ -367,7 +367,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
                         float diffX = laserCloud->points[ind + l].x - laserCloud->points[ind + l - 1].x;
                         float diffY = laserCloud->points[ind + l].y - laserCloud->points[ind + l - 1].y;
                         float diffZ = laserCloud->points[ind + l].z - laserCloud->points[ind + l - 1].z;
-                        if (diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05)
+                        if (diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05) //이게 어떤 의미를 가질까?
                         {
                             break;
                         }
@@ -459,9 +459,9 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 }
 
 int main(int argc, char **argv)
-{
-    ros::init(argc, argv, "scanRegistration");
-    ros::NodeHandle nh;
+{//ROS sub, pub을 이해하기 위한 wiki: http://wiki.ros.org/roscpp_tutorials/Tutorials/WritingPublisherSubscriber
+    ros::init(argc, argv, "scanRegistration"); //ROS system을 쓰기 위해 시작하는 함수
+    ros::NodeHandle nh; //NodeHandle은 ROS system과 communication하기 위한 메인 access point
 
     nh.param<int>("scan_line", N_SCANS, 16);
 
@@ -474,11 +474,47 @@ int main(int argc, char **argv)
         printf("only support velodyne with 16, 32 or 64 scan line!");
         return 0;
     }
-
+    /** <subscribe 설명>
+   * The subscribe() call is how you tell ROS that you want to receive messages
+   * on a given topic.  This invokes a call to the ROS
+   * master node, which keeps a registry of who is publishing and who
+   * is subscribing.  Messages are passed to a callback function, here
+   * called chatterCallback.  subscribe() returns a Subscriber object that you
+   * must hold on to until you want to unsubscribe.  When all copies of the Subscriber
+   * object go out of scope, this callback will automatically be unsubscribed from
+   * this topic.
+   *
+   * The second parameter to the subscribe() function is the size of the message
+   * queue.  If messages are arriving faster than they are being processed, this
+   * is the number of messages that will be buffered up before beginning to throw
+   * away the oldest ones.
+   */
     ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, laserCloudHandler);
+    //subscribe() 함수는 ROS에게 주어진 topic의 메세지를 전달받겠다는 의미이다. 
+    //첫번째 인자는 전달 받는 topic의 이름이며, 두번째 인자는 메세지 큐의 크기이다.
+    //세번째 인자는 전달받는 메세지가 처리될 callback function(함수로써 다른 함수에 전달되는 함수)을 의미한다.
 
+
+    /** <advertise 설명>
+   * The advertise() function is how you tell ROS that you want to
+   * publish on a given topic name. This invokes a call to the ROS
+   * master node, which keeps a registry of who is publishing and who
+   * is subscribing. After this advertise() call is made, the master
+   * node will notify anyone who is trying to subscribe to this topic name,
+   * and they will in turn negotiate a peer-to-peer connection with this
+   * node.  advertise() returns a Publisher object which allows you to
+   * publish messages on that topic through a call to publish().  Once
+   * all copies of the returned Publisher object are destroyed, the topic
+   * will be automatically unadvertised.
+   *
+   * The second parameter to advertise() is the size of the message queue
+   * used for publishing messages.  If messages are published more quickly
+   * than we can send them, the number here specifies how many messages to
+   * buffer up before throwing some away.
+   */
     pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);
-
+    //advertise() 함수는 주어진 topic 이름으로 publish 하고싶다고 ROS에게 알리는 함수이다.
+    //두번째 인자는 advertise되는 메세지의 큐 사이즈를 의미한다.
     pubCornerPointsSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 100);
 
     pubCornerPointsLessSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_sharp", 100);
@@ -497,7 +533,14 @@ int main(int argc, char **argv)
             pubEachScan.push_back(tmp);
         }
     }
-    ros::spin();
 
+    /** <spin 설명>
+   * ros::spin() will enter a loop, pumping callbacks.  With this version, all
+   * callbacks will be called from within this thread (the main one).  ros::spin()
+   * will exit when Ctrl-C is pressed, or the node is shutdown by the master.
+   */
+    ros::spin();
+    //callback 함수들을 부르는 loop에 들어감.
+    //여기에서는 laserCloudHandler 콜백함수가 loop에서 계속 돌아감.
     return 0;
 }
