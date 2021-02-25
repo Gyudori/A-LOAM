@@ -490,6 +490,9 @@ int main(int argc, char **argv)
    * away the oldest ones.
    */
     ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, laserCloudHandler);
+    // ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/point_cloud", 100, laserCloudHandler); 
+    // For LGSVL. Also change topic name of .rviz
+
     //subscribe() 함수는 ROS에게 주어진 topic의 메세지를 전달받겠다는 의미이다. 
     //첫번째 인자는 전달 받는 topic의 이름이며, 두번째 인자는 메세지 큐의 크기이다.
     //세번째 인자는 전달받는 메세지가 처리될 callback function(함수로써 다른 함수에 전달되는 함수)을 의미한다.
@@ -502,7 +505,7 @@ int main(int argc, char **argv)
    * is subscribing. After this advertise() call is made, the master
    * node will notify anyone who is trying to subscribe to this topic name,
    * and they will in turn negotiate a peer-to-peer connection with this
-   * node.  advertise() returns a Publisher object which allows you to
+   * node.  advertise() returns a Publis-er object which allows you to
    * publish messages on that topic through a call to publish().  Once
    * all copies of the returned Publisher object are destroyed, the topic
    * will be automatically unadvertised.
