@@ -258,7 +258,7 @@ void process()
 			{
 				mBuf.unlock();
 				break;
-			}
+			} // Buf input check
 
 			timeLaserCloudCornerLast = cornerLastBuf.front()->header.stamp.toSec();
 			timeLaserCloudSurfLast = surfLastBuf.front()->header.stamp.toSec();
@@ -273,7 +273,7 @@ void process()
 				printf("unsync messeage!");
 				mBuf.unlock();
 				break;
-			}
+			} // Time check
 
 			laserCloudCornerLast->clear();
 			pcl::fromROSMsg(*cornerLastBuf.front(), *laserCloudCornerLast);
