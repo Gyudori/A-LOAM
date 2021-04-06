@@ -1,11 +1,11 @@
 <launch>
+    <param name="dataset_folder" type="string" value="/media/gyuseok/Backup Plus/03_kitti_lidar_odometry/" />
+    <param name="publish_delay" type="int" value="1" />
+    <param name="load_frame_num" type="int" value="50" />
+    <param name="sequence_number" type="string" value="00" />
+    <param name="to_bag" type="bool" value="false" />
+    <param name="output_bag_file" type="string" value="/home/gyuseok/catkin_ws_kitti/test.bag" />
     
+    <node name="kittiHelperGyu1" pkg="kitti_helper_gyu" type="kittiHelperGyu" output="screen" />
 
-    <node name="kittiHelper" pkg="aloam_velodyne" type="kittiHelper" output="screen"> 
-        <param name="dataset_folder" type="string" value="/media/gyuseok/Backup Plus/03_kitti_lidar_odometry/dataset_folder/" />
-        <param name="sequence_number" type="string" value="00" />
-        <param name="to_bag" type="bool" value="false" />
-        <param name="output_bag_file" type="string" value="/home/gyuseok/Downloads/kitti1.bag" /> <!-- replace with your output folder -->
-        <param name="publish_delay" type="int" value="1" />
-    </node>
 </launch>

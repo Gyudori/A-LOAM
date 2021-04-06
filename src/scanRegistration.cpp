@@ -70,6 +70,7 @@ int cloudLabel[400000];
 
 bool comp (int i,int j) { return (cloudCurvature[i]<cloudCurvature[j]); }
 
+ros::Publisher pubLaserCloudIntensity;
 ros::Publisher pubLaserCloud;
 ros::Publisher pubCornerPointsSharp;
 ros::Publisher pubCornerPointsLessSharp;
@@ -129,7 +130,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     std::vector<int> scanStartInd(N_SCANS, 0);
     std::vector<int> scanEndInd(N_SCANS, 0);
 
-    pcl::PointCloud<pcl::PointXYZ> laserCloudIn;
+    pcl::PointCloud<PointType> laserCloudIn;
     pcl::fromROSMsg(*laserCloudMsg, laserCloudIn); //ROS Message로 들어온 *laserCloudMsg를 pcl의 PointXYZ로 변환
     std::vector<int> indices;
 
@@ -157,6 +158,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     int count = cloudSize;
     PointType point;
     std::vector<pcl::PointCloud<PointType>> laserCloudScans(N_SCANS);
+    std::vector<pcl::PointCloud<PointType>> laserCloudScansItensity(N_SCANS);
     for (int i = 0; i < cloudSize; i++)
     {
         point.x = laserCloudIn.points[i].x;
@@ -191,8 +193,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             else
                 scanID = N_SCANS / 2 + int((-8.83 - angle) * 2.0 + 0.5);
 
-            // use [0 50]  > 50 remove outlies 
-            if (angle > 2 || angle < -24.33 || scanID > 50 || scanID < 0)
+            if (angle > 2 || angle < -24.33 || scanID > (N_SCANS - 1) || scanID < 0)
             {
                 count--;
                 continue;
@@ -238,17 +239,23 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         float relTime = (ori - startOri) / (endOri - startOri);
         point.intensity = scanID + scanPeriod * relTime;
         laserCloudScans[scanID].push_back(point); 
+
+        point.intensity = (float)scanID;
+        laserCloudScansItensity[scanID].push_back(point); 
     }//여기까지가 정규성 검사 - 1)point cloud가 스캐닝 범위 내에 존재하는지, 2) 수평각이 알맞게 계산됐는지 확인
     
     cloudSize = count;
     printf("points size %d \n", cloudSize);
 
     pcl::PointCloud<PointType>::Ptr laserCloud(new pcl::PointCloud<PointType>());
+    pcl::PointCloud<PointType>::Ptr laserCloudIntensity(new pcl::PointCloud<PointType>());
     for (int i = 0; i < N_SCANS; i++)
     { 
         scanStartInd[i] = laserCloud->size() + 5; //아하... 클라우드가 시작하고 나서 1~4번째 point는 이웃이 10개가 안되기 때문에 start index를 5번째 부터 채우고 저장
         *laserCloud += laserCloudScans[i];
         scanEndInd[i] = laserCloud->size() - 6;
+
+        *laserCloudIntensity += laserCloudScansItensity[i];
     }
 
     printf("prepare time %f \n", t_prepare.toc());
@@ -409,6 +416,11 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     printf("sort q time %f \n", t_q_sort);
     printf("seperate points time %f \n", t_pts.toc());
 
+    sensor_msgs::PointCloud2 laserCloudIntensityOutMsg;
+    pcl::toROSMsg(*laserCloudIntensity, laserCloudIntensityOutMsg);
+    laserCloudIntensityOutMsg.header.stamp = laserCloudMsg->header.stamp;
+    laserCloudIntensityOutMsg.header.frame_id = "/camera_init";
+    pubLaserCloudIntensity.publish(laserCloudIntensityOutMsg);
 
     sensor_msgs::PointCloud2 laserCloudOutMsg;
     pcl::toROSMsg(*laserCloud, laserCloudOutMsg);
@@ -515,6 +527,8 @@ int main(int argc, char **argv)
    * than we can send them, the number here specifies how many messages to
    * buffer up before throwing some away.
    */
+    pubLaserCloudIntensity = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_intensity", 100);
+
     pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);
     //advertise() 함수는 주어진 topic 이름으로 publish 하고싶다고 ROS에게 알리는 함수이다.
     //두번째 인자는 advertise되는 메세지의 큐 사이즈를 의미한다.
