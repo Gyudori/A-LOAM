@@ -97,7 +97,7 @@ Eigen::Vector3d t_w_curr(0, 0, 0);
 double para_q[4] = {0, 0, 0, 1};
 double para_t[3] = {0, 0, 0};
 
-Eigen::Map<Eigen::Quaterniond> q_last_curr(para_q);
+Eigen::Map<Eigen::Quaterniond> q_last_curr(para_q); // Map: mapping an existing array of data.
 Eigen::Map<Eigen::Vector3d> t_last_curr(para_t);
 
 std::queue<sensor_msgs::PointCloud2ConstPtr> cornerSharpBuf;
