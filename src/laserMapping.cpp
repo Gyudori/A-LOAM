@@ -146,7 +146,7 @@ std::vector<float> pointSearchSqDis;
 PointType pointOri, pointSel;
 
 ros::Publisher pubLaserCloudSurround, pubLaserCloudMap, pubLaserCloudFullRes, pubOdomAftMapped, pubOdomAftMappedHighFrec, pubLaserAfterMappedPath;
-ros::Publisher pubLaserCloudOrig;
+ros::Publisher pubLaserCloudOrig, pubLaserCloudIntensity;
 
 nav_msgs::Path laserAfterMappedPath;
 
@@ -893,6 +893,7 @@ void process()
 			pcl::toROSMsg(*laserCloudIntensity, laserCloudIntensity2);
 			laserCloudIntensity2.header.stamp = ros::Time().fromSec(timeLaserOdometry);
 			laserCloudIntensity2.header.frame_id = "/camera_init";
+			pubLaserCloudIntensity.publish(laserCloudIntensity2);
 
 			printf("mapping pub time %f ms \n", t_pub.toc());
 
@@ -998,6 +999,8 @@ int main(int argc, char **argv)
 	pubLaserAfterMappedPath = nh.advertise<nav_msgs::Path>("/aft_mapped_path", 100);
 
 	pubLaserCloudOrig = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_points2", 100);
+
+	pubLaserCloudIntensity = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_points_intensity", 100);
 
 	for (int i = 0; i < laserCloudNum; i++)
 	{

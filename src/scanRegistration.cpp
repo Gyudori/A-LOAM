@@ -83,6 +83,8 @@ bool PUB_EACH_LINE = false;
 
 double MINIMUM_RANGE = 0.1; 
 
+std::string SET_POINT_COLOR = "i";
+
 template <typename PointT>
 void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
                               pcl::PointCloud<PointT> &cloud_out, float thres)
@@ -240,7 +242,11 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         point.intensity = scanID + scanPeriod * relTime;
         laserCloudScans[scanID].push_back(point); 
 
-        point.intensity = (float)scanID;
+        if(SET_POINT_COLOR == "i")
+            point.intensity = laserCloudIn.points[i].intensity;
+        else if(SET_POINT_COLOR == "r")
+            point.intensity = (float)scanID/(N_SCANS-1);
+        
         laserCloudScansItensity[scanID].push_back(point); 
     }//여기까지가 정규성 검사 - 1)point cloud가 스캐닝 범위 내에 존재하는지, 2) 수평각이 알맞게 계산됐는지 확인
     
@@ -479,6 +485,7 @@ int main(int argc, char **argv)
 
     nh.param<double>("minimum_range", MINIMUM_RANGE, 0.1);
 
+    nh.getParam("set_point_color", SET_POINT_COLOR);
     printf("scan line number %d \n", N_SCANS);
 
     if(N_SCANS != 16 && N_SCANS != 32 && N_SCANS != 64)

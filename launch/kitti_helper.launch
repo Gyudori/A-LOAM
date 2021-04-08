@@ -1,7 +1,7 @@
 <launch>
     <param name="dataset_folder" type="string" value="/media/gyuseok/Backup Plus/03_kitti_lidar_odometry/" />
     <param name="publish_delay" type="int" value="1" />
-    <param name="load_frame_num" type="int" value="50" />
+    <param name="load_frame_num" type="int" value="10" />
     <param name="sequence_number" type="string" value="00" />
     <param name="to_bag" type="bool" value="false" />
     <param name="output_bag_file" type="string" value="/home/gyuseok/catkin_ws_kitti/test.bag" />
