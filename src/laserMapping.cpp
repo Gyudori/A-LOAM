@@ -133,7 +133,6 @@ std::queue<sensor_msgs::PointCloud2ConstPtr> cornerLastBuf;
 std::queue<sensor_msgs::PointCloud2ConstPtr> surfLastBuf;
 std::queue<sensor_msgs::PointCloud2ConstPtr> fullResBuf;
 std::queue<sensor_msgs::PointCloud2ConstPtr> origBuf;
-std::queue<sensor_msgs::PointCloud2ConstPtr> intensityBuf;
 std::queue<nav_msgs::Odometry::ConstPtr> odometryBuf;
 std::mutex mBuf;
 
@@ -146,7 +145,7 @@ std::vector<float> pointSearchSqDis;
 PointType pointOri, pointSel;
 
 ros::Publisher pubLaserCloudSurround, pubLaserCloudMap, pubLaserCloudFullRes, pubOdomAftMapped, pubOdomAftMappedHighFrec, pubLaserAfterMappedPath;
-ros::Publisher pubLaserCloudOrig, pubLaserCloudIntensity;
+ros::Publisher pubLaserCloudOrig;
 
 nav_msgs::Path laserAfterMappedPath;
 
@@ -209,13 +208,6 @@ void laserCloudOrigHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudOri
 {
 	mBuf.lock();
 	origBuf.push(laserCloudOrig2);
-	mBuf.unlock();
-}
-
-void laserCloudIntensityHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudIntensity)
-{
-	mBuf.lock();
-	intensityBuf.push(laserCloudIntensity);
 	mBuf.unlock();
 }
 
@@ -318,10 +310,6 @@ void process()
 			laserCloudOrig->clear();
 			pcl::fromROSMsg(*origBuf.front(), *laserCloudOrig);
 			origBuf.pop();
-
-			laserCloudIntensity->clear();
-			pcl::fromROSMsg(*intensityBuf.front(), *laserCloudIntensity);
-			intensityBuf.pop();
 
 			q_wodom_curr.x() = odometryBuf.front()->pose.pose.orientation.x;
 			q_wodom_curr.y() = odometryBuf.front()->pose.pose.orientation.y;
@@ -889,12 +877,6 @@ void process()
 			laserCloudOrig3.header.frame_id = "/camera_init";
 			pubLaserCloudOrig.publish(laserCloudOrig3);
 
-			sensor_msgs::PointCloud2 laserCloudIntensity2;
-			pcl::toROSMsg(*laserCloudIntensity, laserCloudIntensity2);
-			laserCloudIntensity2.header.stamp = ros::Time().fromSec(timeLaserOdometry);
-			laserCloudIntensity2.header.frame_id = "/camera_init";
-			pubLaserCloudIntensity.publish(laserCloudIntensity2);
-
 			printf("mapping pub time %f ms \n", t_pub.toc());
 
 			printf("whole mapping time %f ms +++++\n", t_whole.toc());
@@ -937,8 +919,6 @@ void process()
 
 			if(to_bag) {
 				bag_out.write("/aft_mapped", ros::Time::now(), odomAftMapped);
-				//bag_out.write("/velodyne_points", ros::Time::now(), laserCloudFullRes3);
-				bag_out.write("/velodyne_points", ros::Time::now(), laserCloudIntensity2);
 			}
 			tic = 0;
 			started = true;
@@ -984,8 +964,6 @@ int main(int argc, char **argv)
 
 	ros::Subscriber subLaserCloudOrig = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, laserCloudOrigHandler);
 
-	ros::Subscriber subLaserCloudIntensity = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_cloud_intensity", 100, laserCloudIntensityHandler);
-
 	pubLaserCloudSurround = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surround", 100);
 
 	pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_map", 100);
@@ -999,8 +977,6 @@ int main(int argc, char **argv)
 	pubLaserAfterMappedPath = nh.advertise<nav_msgs::Path>("/aft_mapped_path", 100);
 
 	pubLaserCloudOrig = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_points2", 100);
-
-	pubLaserCloudIntensity = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_points_intensity", 100);
 
 	for (int i = 0; i < laserCloudNum; i++)
 	{

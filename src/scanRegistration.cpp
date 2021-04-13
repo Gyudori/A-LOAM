@@ -70,7 +70,7 @@ int cloudLabel[400000];
 
 bool comp (int i,int j) { return (cloudCurvature[i]<cloudCurvature[j]); }
 
-ros::Publisher pubLaserCloudIntensity;
+ros::Publisher pubLaserCloudIR;
 ros::Publisher pubLaserCloud;
 ros::Publisher pubCornerPointsSharp;
 ros::Publisher pubCornerPointsLessSharp;
@@ -159,13 +159,19 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     bool halfPassed = false;
     int count = cloudSize;
     PointType point;
+    PointXYZIR pointIR;
     std::vector<pcl::PointCloud<PointType>> laserCloudScans(N_SCANS);
     std::vector<pcl::PointCloud<PointType>> laserCloudScansItensity(N_SCANS);
+    std::vector<pcl::PointCloud<PointXYZIR>> laserCloudScansIR(N_SCANS);
     for (int i = 0; i < cloudSize; i++)
     {
         point.x = laserCloudIn.points[i].x;
         point.y = laserCloudIn.points[i].y;
         point.z = laserCloudIn.points[i].z;
+
+        pointIR.x = laserCloudIn.points[i].x;
+        pointIR.y = laserCloudIn.points[i].y;
+        pointIR.z = laserCloudIn.points[i].z;
 
         float angle = atan(point.z / sqrt(point.x * point.x + point.y * point.y)) * 180 / M_PI;
         int scanID = 0;
@@ -242,26 +248,24 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         point.intensity = scanID + scanPeriod * relTime;
         laserCloudScans[scanID].push_back(point); 
 
-        if(SET_POINT_COLOR == "i")
-            point.intensity = laserCloudIn.points[i].intensity;
-        else if(SET_POINT_COLOR == "r")
-            point.intensity = (float)scanID/(N_SCANS-1);
-        
-        laserCloudScansItensity[scanID].push_back(point); 
+        pointIR.intensity = laserCloudIn.points[i].intensity*100;
+        pointIR.ring = scanID;
+
+        laserCloudScansIR[scanID].push_back(pointIR);        
     }//여기까지가 정규성 검사 - 1)point cloud가 스캐닝 범위 내에 존재하는지, 2) 수평각이 알맞게 계산됐는지 확인
     
     cloudSize = count;
     printf("points size %d \n", cloudSize);
 
     pcl::PointCloud<PointType>::Ptr laserCloud(new pcl::PointCloud<PointType>());
-    pcl::PointCloud<PointType>::Ptr laserCloudIntensity(new pcl::PointCloud<PointType>());
+    pcl::PointCloud<PointXYZIR>::Ptr laserCloudIR(new pcl::PointCloud<PointXYZIR>());
     for (int i = 0; i < N_SCANS; i++)
     { 
         scanStartInd[i] = laserCloud->size() + 5; //아하... 클라우드가 시작하고 나서 1~4번째 point는 이웃이 10개가 안되기 때문에 start index를 5번째 부터 채우고 저장
         *laserCloud += laserCloudScans[i];
         scanEndInd[i] = laserCloud->size() - 6;
 
-        *laserCloudIntensity += laserCloudScansItensity[i];
+        *laserCloudIR += laserCloudScansIR[i];
     }
 
     printf("prepare time %f \n", t_prepare.toc());
@@ -422,11 +426,11 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     printf("sort q time %f \n", t_q_sort);
     printf("seperate points time %f \n", t_pts.toc());
 
-    sensor_msgs::PointCloud2 laserCloudIntensityOutMsg;
-    pcl::toROSMsg(*laserCloudIntensity, laserCloudIntensityOutMsg);
-    laserCloudIntensityOutMsg.header.stamp = laserCloudMsg->header.stamp;
-    laserCloudIntensityOutMsg.header.frame_id = "/camera_init";
-    pubLaserCloudIntensity.publish(laserCloudIntensityOutMsg);
+    sensor_msgs::PointCloud2 laserCloudIRMsg;
+    pcl::toROSMsg(*laserCloudIR, laserCloudIRMsg);
+    laserCloudIRMsg.header.stamp = laserCloudMsg->header.stamp;
+    laserCloudIRMsg.header.frame_id = "/camera_init";
+    pubLaserCloudIR.publish(laserCloudIRMsg);
 
     sensor_msgs::PointCloud2 laserCloudOutMsg;
     pcl::toROSMsg(*laserCloud, laserCloudOutMsg);
@@ -534,7 +538,7 @@ int main(int argc, char **argv)
    * than we can send them, the number here specifies how many messages to
    * buffer up before throwing some away.
    */
-    pubLaserCloudIntensity = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_intensity", 100);
+    pubLaserCloudIR = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_intensity_ring", 100);
 
     pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);
     //advertise() 함수는 주어진 topic 이름으로 publish 하고싶다고 ROS에게 알리는 함수이다.

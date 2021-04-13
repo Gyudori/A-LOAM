@@ -39,6 +39,27 @@
 #include <cmath>
 
 #include <pcl/point_types.h>
+#include <pcl/impl/pcl_base.hpp>
+
+struct PointXYZIR{
+    PCL_ADD_POINT4D;
+
+    union{
+        float data_c[4];
+        struct{
+            int ring;
+            int intensity;
+        };
+    };
+};
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIR,
+    (float, x, x)
+    (float, y, y)
+    (float, z, z)
+    (int, ring, ring)
+    (int, intensity, intensity)
+)
 
 typedef pcl::PointXYZI PointType;
 
