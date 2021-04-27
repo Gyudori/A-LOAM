@@ -53,6 +53,8 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
 
+#include <pcl/io/ply_io.h>
+
 using std::atan2;
 using std::cos;
 using std::sin;
@@ -156,7 +158,11 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     }
     //printf("end Ori %f\n", endOri);
 
-    bool halfPassed = false;
+    int upper_removed_count = 0;
+    int lower_removed_count = 0;
+    std::vector<float> angles;
+
+    bool halfPassed = false;    
     int count = cloudSize;
     PointType point;
     PointXYZIR pointIR;
@@ -174,6 +180,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         pointIR.z = laserCloudIn.points[i].z;
 
         float angle = atan(point.z / sqrt(point.x * point.x + point.y * point.y)) * 180 / M_PI;
+        angles.push_back(angle);
         int scanID = 0;
 
         if (N_SCANS == 16)
@@ -187,13 +194,15 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         }
         else if (N_SCANS == 32)
         {
-            scanID = int((angle + 92.0/3.0) * 3.0 / 4.0);
+            scanID = int((angle + 92.0/3.0) * 3.0 / 4.0 + 0.5);
             if (scanID > (N_SCANS - 1) || scanID < 0)
             {
+                upper_removed_count++;
                 count--;
                 continue;
             }
         }
+        
         else if (N_SCANS == 64)
         {   
             if (angle >= -8.83)
@@ -203,6 +212,15 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 
             if (angle > 2 || angle < -24.33 || scanID > (N_SCANS - 1) || scanID < 0)
             {
+                printf("Outlied point. angle %f scanID %d \n", angle, scanID);
+                if(angle > 2){
+                    upper_removed_count++;
+                }
+
+                else if(angle < -24.33){
+                    lower_removed_count++;
+                }
+                
                 count--;
                 continue;
             }
@@ -254,6 +272,18 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         laserCloudScansIR[scanID].push_back(pointIR);        
     }//여기까지가 정규성 검사 - 1)point cloud가 스캐닝 범위 내에 존재하는지, 2) 수평각이 알맞게 계산됐는지 확인
     
+    printf("Upper removed count of points %d \n", upper_removed_count);
+    // printf("Lower removed count of points %d \n", lower_removed_count);
+
+    // std::string angles_filename = "/home/gyuseok/catkin_ws_kitti/result_data/angles.txt";
+    // std::ofstream file(angles_filename.c_str());
+    // if(file.is_open()){
+    //     for(const auto angle : angles){
+    //         file << angle << "\n";
+    //     }
+    // }
+    // file.close();
+
     cloudSize = count;
     printf("points size %d \n", cloudSize);
 
@@ -267,6 +297,11 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 
         *laserCloudIR += laserCloudScansIR[i];
     }
+
+    // // For Debug
+    // pcl::PLYWriter writer;
+    // writer.write<PointXYZIR> ("/home/gyuseok/catkin_ws_kitti/result_data/one_frame.ply",
+    //                             *laserCloudIR, false);
 
     printf("prepare time %f \n", t_prepare.toc());
 
@@ -512,7 +547,7 @@ int main(int argc, char **argv)
    * is the number of messages that will be buffered up before beginning to throw
    * away the oldest ones.
    */
-    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, laserCloudHandler);
+    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/lidar_red_pointcloud", 100, laserCloudHandler);
     // ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/point_cloud", 100, laserCloudHandler); 
     // For LGSVL. Also change topic name of .rviz
 

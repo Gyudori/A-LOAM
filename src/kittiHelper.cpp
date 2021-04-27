@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     // Variable definition
     std::string dataset_folder, sequence_number, output_bag_file;
     int publish_delay, load_frame_num;    
-    bool to_bag;
+    bool to_bag, load_gt_path;
     pcl::PointCloud<pcl::PointXYZI> lidarMap;
 
     // Get parameter from launch file
@@ -60,6 +60,7 @@ int main(int argc, char** argv)
     nh.getParam("publish_delay", publish_delay);
     nh.getParam("sequence_number", sequence_number);
     nh.getParam("to_bag", to_bag);
+    nh.getParam("load_gt_path", load_gt_path);
     nh.getParam("output_bag_file", output_bag_file);
     nh.getParam("load_frame_num", load_frame_num);
 
@@ -68,13 +69,13 @@ int main(int argc, char** argv)
     nav_msgs::Odometry odomGT;
     odomGT.header.frame_id = "/camera_init";
     odomGT.child_frame_id = "/ground_truth";
-
+    
     // Timestamp & GT path
     std::string timestamp_path = "data_odometry_calib/dataset/sequences/" + sequence_number + "/times.txt";
     std::ifstream timestamp_file(dataset_folder + timestamp_path, std::ifstream::in);
 
     std::string ground_truth_path = "data_odometry_poses/dataset/poses/" + sequence_number + ".txt";
-    std::ifstream ground_truth_file(dataset_folder + ground_truth_path, std::ifstream::in);
+    std::ifstream ground_truth_file(dataset_folder + ground_truth_path, std::ifstream::in);    
 
     // Transformation variables
     Eigen::Matrix3d R_transform;
@@ -92,32 +93,32 @@ int main(int argc, char** argv)
     std::string line;
     int line_num = 0;
 
-    while(std::getline(timestamp_file, line) && ros::ok() && line_num < load_frame_num)
+    while(ros::ok() && line_num < load_frame_num)
     {        
-        // Timestamp & GT part
-        float timestamp = stof(line);
-        
-        std::getline(ground_truth_file, line);
-        std::stringstream pose_stream(line);
-        std::string s;
-        Eigen::Matrix<double, 3, 4> gt_pose;
+        if(load_gt_path){
+            // Timestamp & GT part
+            float timestamp = stof(line);
+            
+            std::getline(ground_truth_file, line);
+            std::stringstream pose_stream(line);
+            std::string s;
+            Eigen::Matrix<double, 3, 4> gt_pose;
 
-        for(std::size_t i = 0; i < 3; ++i)
-        {
-            for(std::size_t j = 0; j < 4; ++j)
+            for(std::size_t i = 0; i < 3; ++i)
             {
-                std::getline(pose_stream, s, ' ');
-                gt_pose(i, j) = stof(s);
+                for(std::size_t j = 0; j < 4; ++j)
+                {
+                    std::getline(pose_stream, s, ' ');
+                    gt_pose(i, j) = stof(s);
+                }
             }
-        }
-        std::cout << "GT_pose" << std::endl <<gt_pose << std::endl;
-        Eigen::Quaterniond q_w_i(gt_pose.topLeftCorner<3, 3>());
-        //Eigen::Quaterniond q = q_transform * q_w_i;
-        Eigen::Quaterniond q =  q_w_i;
-        q.normalize();
-        //Eigen::Vector3d t = q_transform * gt_pose.topRightCorner<3, 1>();
-        Eigen::Vector3d t = gt_pose.topRightCorner<3, 1>();
-
+            std::cout << "GT_pose" << std::endl <<gt_pose << std::endl;
+            Eigen::Quaterniond q_w_i(gt_pose.topLeftCorner<3, 3>());
+            //Eigen::Quaterniond q = q_transform * q_w_i;
+            Eigen::Quaterniond q =  q_w_i;
+            q.normalize();
+            //Eigen::Vector3d t = q_transform * gt_pose.topRightCorner<3, 1>();
+            Eigen::Vector3d t = gt_pose.topRightCorner<3, 1>();  
 
         odomGT.header.stamp = ros::Time().fromSec(timestamp);
         odomGT.pose.pose.orientation.x = q.x();
@@ -128,34 +129,60 @@ int main(int argc, char** argv)
         odomGT.pose.pose.position.y = t(1);
         odomGT.pose.pose.position.z = t(2);
         pubOdomGT.publish(odomGT);
+        }
 
         // Lidar part
         std::stringstream lidar_data_path;
-        lidar_data_path << dataset_folder << "data_odometry_velodyne/velodyne/sequences/" + sequence_number + "/velodyne/"
-                        << std::setfill('0') << std::setw(6) << line_num << ".bin";
-        std::cout << lidar_data_path.str() << std::endl;
+        lidar_data_path << dataset_folder << std::setfill('0') << std::setw(10) << line_num << ".txt";       
+        std::ifstream lidar_data_file(lidar_data_path.str(), std::ifstream::in);    
 
-        std::vector<float> lidar_data = read_lidar_data(lidar_data_path.str());
-        std::cout << "totally " << lidar_data.size() / 4.0 << " points in this lidar frame \n" << std::endl;
+        lidar_data_file.seekg(0, ios::end);
+        int cloud_size = lidar_data_file.tellg();
+        std::cout << "totally " << cloud_size << " points in this lidar frame \n" << std::endl;
+        lidar_data_file.seekg(0, std::ios::beg);
 
         std::vector<Eigen::Vector3d> lidar_points;
         std::vector<float> lidar_intensities;
-        pcl::PointCloud<pcl::PointXYZI> laser_cloud;        
+        pcl::PointCloud<pcl::PointXYZI> laser_cloud;   
 
-        for(std::size_t i = 0; i < lidar_data.size(); i+=4)
-        {
-            lidar_points.emplace_back(lidar_data[i], lidar_data[i+1], lidar_data[i+2]);
-            lidar_intensities.emplace_back(lidar_data[i+3]);
+        std::string line;
+        std::string s;
+        while(lidar_data_file >> s){                      
+            pcl::PointXYZI point;            
+            
+            point.x = stof(s);
+            lidar_data_file >> s;
+            point.y = stof(s);
+            lidar_data_file >> s;
+            point.z = stof(s);
+            lidar_data_file >> s;
+            point.intensity = stof(s);
 
-            pcl::PointXYZI point;
-            pcl::PointXYZ point_xyz;
-            point.x = lidar_data[i];
-            point.y = lidar_data[i + 1];
-            point.z = lidar_data[i + 2];
-            point.intensity = lidar_data[i + 3];
-            laser_cloud.push_back(point);
-            lidarMap.push_back(point);
-        }
+            laser_cloud.push_back(point);            
+        }  
+        lidar_data_file.close();   
+
+        // std::vector<float> lidar_data = read_lidar_data(lidar_data_path.str());
+        // std::cout << "totally " << lidar_data.size() / 4.0 << " points in this lidar frame \n" << std::endl;
+
+        // std::vector<Eigen::Vector3d> lidar_points;
+        // std::vector<float> lidar_intensities;
+        // pcl::PointCloud<pcl::PointXYZI> laser_cloud;        
+
+        // for(std::size_t i = 0; i < lidar_data.size(); i+=4)
+        // {
+        //     lidar_points.emplace_back(lidar_data[i], lidar_data[i+1], lidar_data[i+2]);
+        //     lidar_intensities.emplace_back(lidar_data[i+3]);
+
+        //     pcl::PointXYZI point;
+        //     pcl::PointXYZ point_xyz;
+        //     point.x = lidar_data[i];
+        //     point.y = lidar_data[i + 1];
+        //     point.z = lidar_data[i + 2];
+        //     point.intensity = lidar_data[i + 3];
+        //     laser_cloud.push_back(point);
+        //     lidarMap.push_back(point);
+        // }
 
         sensor_msgs::PointCloud2 laser_cloud_msg;
         pcl::toROSMsg(laser_cloud, laser_cloud_msg);
